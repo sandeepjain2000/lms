@@ -1,6 +1,7 @@
 "use client"
 
 import { useState, useEffect } from "react"
+import { useSession } from "next-auth/react"
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
@@ -24,6 +25,8 @@ export function HolidaysClient() {
   const [name, setName] = useState("")
   const [date, setDate] = useState("")
   const [saving, setSaving] = useState(false)
+  const { data: session } = useSession()
+  const isAdmin = (session?.user as any)?.role === "ADMIN"
 
   useEffect(() => {
     fetchHolidays()
@@ -97,9 +100,11 @@ export function HolidaysClient() {
           <h1 className="text-2xl font-bold tracking-tight">Public Holidays</h1>
           <p className="text-slate-500">Manage the annual holiday calendar for leave calculations.</p>
         </div>
-        <Button onClick={handleOpenAdd} className="bg-indigo-600 hover:bg-indigo-700">
-          <Plus className="w-4 h-4 mr-2" /> Add Holiday
-        </Button>
+        {isAdmin && (
+          <Button onClick={handleOpenAdd} className="bg-indigo-600 hover:bg-indigo-700">
+            <Plus className="w-4 h-4 mr-2" /> Add Holiday
+          </Button>
+        )}
       </div>
 
       <Card>
@@ -135,14 +140,16 @@ export function HolidaysClient() {
                       <TableCell>{d.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: 'numeric' })}</TableCell>
                       <TableCell className="text-slate-500">{d.toLocaleDateString('en-GB', { weekday: 'long' })}</TableCell>
                       <TableCell className="text-right">
-                        <div className="flex justify-end gap-2">
-                          <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(h)}>
-                            <Edit2 className="w-4 h-4 text-slate-400 hover:text-indigo-600" />
-                          </Button>
-                          <Button variant="ghost" size="icon" onClick={() => handleDelete(h.id)}>
-                            <Trash2 className="w-4 h-4 text-slate-400 hover:text-red-600" />
-                          </Button>
-                        </div>
+                        {isAdmin && (
+                          <div className="flex justify-end gap-2">
+                            <Button variant="ghost" size="icon" onClick={() => handleOpenEdit(h)}>
+                              <Edit2 className="w-4 h-4 text-slate-400 hover:text-indigo-600" />
+                            </Button>
+                            <Button variant="ghost" size="icon" onClick={() => handleDelete(h.id)}>
+                              <Trash2 className="w-4 h-4 text-slate-400 hover:text-red-600" />
+                            </Button>
+                          </div>
+                        )}
                       </TableCell>
                     </TableRow>
                   )

@@ -15,12 +15,16 @@ export async function calculateMonthlyPLAccrual(
   const totalDays = allDays.length
 
   // 2. Fetch system configs
-  const monthlyEntitlement = await prisma.systemConfig.findUnique({ where: { key: 'PL_ACCRUAL_PER_MONTH' } })
-  const minThreshold = await prisma.systemConfig.findUnique({ where: { key: 'MIN_WORKED_DAYS_FOR_PL' } })
-  const includePaidLeave = await prisma.systemConfig.findUnique({ where: { key: 'INCLUDE_PAID_LEAVE_IN_ACCRUAL' } })
+  const [rateConfig, baseConfig, thresholdConfig, includePaidLeave] = await Promise.all([
+    prisma.systemConfig.findUnique({ where: { key: 'ACCRUAL_RATE_PL' } }),
+    prisma.systemConfig.findUnique({ where: { key: 'ACCRUAL_BASE_DAYS' } }),
+    prisma.systemConfig.findUnique({ where: { key: 'MIN_WORKED_DAYS_FOR_PL' } }),
+    prisma.systemConfig.findUnique({ where: { key: 'INCLUDE_PAID_LEAVE_IN_ACCRUAL' } })
+  ])
   
-  const rate = parseFloat(monthlyEntitlement?.value || "1.5")
-  const threshold = parseInt(minThreshold?.value || "15")
+  const rate = parseFloat(rateConfig?.value || "1.5")
+  const baseDays = parseInt(baseConfig?.value || "20")
+  const threshold = parseInt(thresholdConfig?.value || "15")
   const paidLeaveCounts = includePaidLeave?.value !== "false" // default true
 
   // 3. Calculate Deductions
@@ -65,10 +69,8 @@ export async function calculateMonthlyPLAccrual(
     }
   }
 
-  // 6. Calculate PL (Pro-rata based on working days vs total potential working days)
-  // Potential working days = totalDays - weekends - holidays
-  const potentialWorkingDays = totalDays - weekendsCount - holidaysCount
-  const accrued = potentialWorkingDays > 0 ? (workingDays / potentialWorkingDays) * rate : 0
+  // 6. Calculate PL (Pro-rata based on working days vs base days)
+  const accrued = baseDays > 0 ? (workingDays / baseDays) * rate : 0
 
   return {
     accrued: parseFloat(accrued.toFixed(2)),

@@ -14,6 +14,7 @@ import {
   LogOut,
   BookOpen,
   User,
+  X,
 } from "lucide-react";
 import { signOut } from "next-auth/react";
 
@@ -30,7 +31,7 @@ const navItems = [
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 
-export function Sidebar() {
+export function Sidebar({ isOpen, onClose }: { isOpen?: boolean, onClose?: () => void }) {
   const pathname = usePathname();
   const { data: session } = useSession();
 
@@ -49,14 +50,29 @@ export function Sidebar() {
   }
 
   return (
-    <aside className="w-64 bg-white text-slate-700 hidden md:flex flex-col border-r border-slate-200 shadow-sm z-10">
-      <div className="h-16 flex items-center px-6 border-b border-slate-200">
+    <>
+      {/* Mobile Overlay */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-slate-900/50 backdrop-blur-sm z-40 md:hidden"
+          onClick={onClose}
+        />
+      )}
+
+      <aside className={cn(
+        "w-64 bg-white text-slate-700 flex flex-col border-r border-slate-200 shadow-sm z-50 transition-transform duration-300 ease-in-out md:translate-x-0 md:static fixed inset-y-0 left-0",
+        isOpen ? "translate-x-0" : "-translate-x-full"
+      )}>
+      <div className="h-16 flex items-center justify-between px-6 border-b border-slate-200">
         <div className="flex items-center gap-2 text-slate-900 font-bold text-xl tracking-tight">
           <div className="bg-indigo-600 w-8 h-8 rounded-lg flex items-center justify-center shadow-sm">
             <span className="text-white text-lg">L</span>
           </div>
           LMS SaaS
         </div>
+        <button onClick={onClose} className="md:hidden p-1 text-slate-400 hover:text-slate-600">
+          <X className="w-5 h-5" />
+        </button>
       </div>
 
       <nav className="flex-1 py-6 px-4 space-y-1 overflow-y-auto">
@@ -67,6 +83,7 @@ export function Sidebar() {
             <Link
               key={item.name}
               href={item.href}
+              onClick={onClose}
               className={cn(
                 "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
                 isActive
@@ -102,5 +119,6 @@ export function Sidebar() {
         </div>
       </div>
     </aside>
+    </>
   );
 }

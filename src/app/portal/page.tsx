@@ -20,6 +20,11 @@ export default async function PortalPage() {
     include: { balances: true, requests: { orderBy: { createdAt: 'desc' } } }
   });
 
+  const maxNegativeConfig = await prisma.systemConfig.findUnique({
+    where: { key: 'MAX_NEGATIVE_LEAVE' }
+  });
+  const maxNegative = parseFloat(maxNegativeConfig?.value || "-5");
+
   if (!user || !user.balances) return <div className="p-8 text-center text-red-500">User balances not found. Contact HR.</div>;
 
   const totalAllowed = 14 + 14 + 5; 
@@ -81,7 +86,7 @@ export default async function PortalPage() {
             <CardTitle>Apply for Leave</CardTitle>
           </CardHeader>
           <CardContent>
-            <LeaveRequestForm userId={user.id} balances={user.balances} />
+            <LeaveRequestForm userId={user.id} balances={user.balances} maxNegative={maxNegative} />
           </CardContent>
         </Card>
         
@@ -106,6 +111,11 @@ export default async function PortalPage() {
                 <div>
                   <p className="font-semibold text-slate-900">{req.type} Leave</p>
                   <p className="text-sm text-slate-500">{new Date(req.startDate).toLocaleDateString()} - {new Date(req.endDate).toLocaleDateString()}</p>
+                  {req.attachmentUrl && (
+                    <a href={req.attachmentUrl} target="_blank" rel="noopener noreferrer" className="text-xs text-indigo-600 hover:underline mt-1 inline-block">
+                      View Document
+                    </a>
+                  )}
                 </div>
                 <Badge variant={req.status === 'HR_APPROVED' ? 'default' : (req.status === 'REJECTED' ? 'destructive' : 'secondary')}>
                   {req.status}

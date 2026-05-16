@@ -45,5 +45,17 @@ export async function POST(req: NextRequest) {
     create: { key, value, description: description ?? '' },
   })
 
+  // Audit Log
+  await prisma.auditLog.create({
+    data: {
+      userId: sessionUser.id,
+      action: 'CONFIG_CHANGED',
+      entity: 'SystemConfig',
+      entityId: key,
+      newValue: value,
+      metadata: JSON.stringify({ description })
+    }
+  })
+
   return NextResponse.json({ success: true, config })
 }

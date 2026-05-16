@@ -73,10 +73,14 @@ export async function importEmployees(rows: CsvEmployeeRow[]) {
   return { success: true, count: importedCount }
 }
 
-export async function updateEmployee(id: string, data: { name: string, role: string }) {
+export async function updateEmployee(id: string, data: { name: string, role: string, lastWorkingDay?: string | null }) {
   await prisma.user.update({
     where: { id },
-    data: { name: data.name, role: data.role }
+    data: { 
+      name: data.name, 
+      role: data.role,
+      lastWorkingDay: data.lastWorkingDay ? new Date(data.lastWorkingDay) : null
+    }
   })
   revalidatePath("/team")
   return { success: true }

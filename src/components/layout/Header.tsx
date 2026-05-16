@@ -17,7 +17,7 @@ import {
 import { useState } from "react";
 import { toast } from "sonner";
 
-export function Header() {
+export function Header({ onMenuClick }: { onMenuClick: () => void }) {
   const [currentDate, setCurrentDate] = useState("2026-05-16");
   const { data: session } = useSession();
 
@@ -32,7 +32,7 @@ export function Header() {
   return (
     <header className="h-16 bg-white border-b border-slate-200 flex items-center justify-between px-4 lg:px-8">
       <div className="flex items-center gap-4">
-        <Button variant="ghost" size="icon" className="md:hidden">
+        <Button variant="ghost" size="icon" className="md:hidden" onClick={onMenuClick}>
           <Menu className="w-5 h-5" />
         </Button>
         <div className="relative hidden sm:block">
@@ -88,6 +88,11 @@ export function Header() {
             <DropdownMenuItem asChild>
               <Link href="/settings">Settings</Link>
             </DropdownMenuItem>
+            {(session?.user as any)?.role === 'ADMIN' || (session?.user as any)?.role === 'MANAGER' ? (
+              <DropdownMenuItem asChild>
+                <Link href="/audit">System Logs</Link>
+              </DropdownMenuItem>
+            ) : null}
             <DropdownMenuSeparator />
             <DropdownMenuItem className="text-red-600" onClick={() => signOut({ callbackUrl: '/login' })}>Log out</DropdownMenuItem>
           </DropdownMenuContent>

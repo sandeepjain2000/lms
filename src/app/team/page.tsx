@@ -21,7 +21,8 @@ export default async function TeamPage() {
     department: user.department?.name || 'N/A',
     plBalance: user.balances?.pl || 0,
     clSlBalance: (user.balances?.cl || 0) + (user.balances?.sl || 0),
-    joinDate: user.joinDate.toLocaleDateString()
+    joinDate: user.joinDate.toLocaleDateString(),
+    lastWorkingDay: user.lastWorkingDay ? user.lastWorkingDay.toLocaleDateString() : null
   }));
 
   return (

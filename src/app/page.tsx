@@ -20,12 +20,8 @@ export default async function DashboardPage() {
   ]);
   
   // 2. Calculations
-  const positivePL = balances.reduce((acc, curr) => acc + (curr.pl > 0 ? curr.pl : 0), 0);
-  const negativePL = balances.reduce((acc, curr) => acc + (curr.pl < 0 ? Math.abs(curr.pl) : 0), 0);
-  
-  const plLiability = positivePL * 2000; // Accrued liability
-  const plRecoverable = negativePL * 2000; // Recoverable asset (Rule 45)
-  const netLiability = plLiability - plRecoverable;
+  const totalPlTaken = balances.reduce((acc, curr) => acc + curr.plUsed, 0);
+  const totalClTaken = balances.reduce((acc, curr) => acc + curr.clUsed, 0);
 
   return (
     <div className="space-y-6 max-w-7xl mx-auto">
@@ -55,24 +51,24 @@ export default async function DashboardPage() {
             <p className="text-xs text-slate-500 mt-1">Requires approval</p>
           </CardContent>
         </Card>
-        <Card className="bg-white border-green-100">
+        <Card className="bg-white border-violet-100">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-green-700">Net Liability (PL)</CardTitle>
-            <CheckCircle2 className="h-4 w-4 text-green-600" />
+            <CardTitle className="text-sm font-medium text-violet-700">Total PL Taken (Team)</CardTitle>
+            <CheckCircle2 className="h-4 w-4 text-violet-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-green-700">₹{netLiability.toLocaleString()}</div>
-            <p className="text-xs text-slate-500 mt-1">Accrued - Recoverable</p>
+            <div className="text-2xl font-bold text-violet-700">{totalPlTaken} days</div>
+            <p className="text-xs text-slate-500 mt-1">Across all employees</p>
           </CardContent>
         </Card>
-        <Card className="bg-white border-blue-100">
+        <Card className="bg-white border-amber-100">
           <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-            <CardTitle className="text-sm font-medium text-blue-700">Recoverable Assets</CardTitle>
-            <AlertCircle className="h-4 w-4 text-blue-600" />
+            <CardTitle className="text-sm font-medium text-amber-700">Total CL Taken (Team)</CardTitle>
+            <AlertCircle className="h-4 w-4 text-amber-600" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold text-blue-700">₹{plRecoverable.toLocaleString()}</div>
-            <p className="text-xs text-slate-500 mt-1">From negative balances</p>
+            <div className="text-2xl font-bold text-amber-700">{totalClTaken} days</div>
+            <p className="text-xs text-slate-500 mt-1">Across all employees</p>
           </CardContent>
         </Card>
       </div>

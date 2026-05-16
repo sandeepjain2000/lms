@@ -40,10 +40,13 @@ export async function POST(request: Request) {
     let projectedPl = balance?.pl || 0
     
     // Monthly accrual logic (Simplified for projection)
+    const rateConfig = await prisma.systemConfig.findUnique({ where: { key: 'ACCRUAL_RATE_PL' } })
+    const rate = parseFloat(rateConfig?.value || "1.5")
+    
     const today = new Date()
     if (start > today) {
       const monthsDiff = (start.getFullYear() - today.getFullYear()) * 12 + (start.getMonth() - today.getMonth())
-      if (monthsDiff > 0) projectedPl += (monthsDiff * 1.5)
+      if (monthsDiff > 0) projectedPl += (monthsDiff * rate)
     }
 
     return NextResponse.json({

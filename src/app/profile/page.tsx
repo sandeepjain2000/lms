@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
-import { Mail, User as UserIcon, ShieldCheck, Loader2 } from "lucide-react"
+import { Mail, User as UserIcon, ShieldCheck, Loader2, Lock } from "lucide-react"
 import { toast } from "sonner"
 
 export default function ProfilePage() {
@@ -14,6 +14,12 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(false)
   const [fetching, setFetching] = useState(true)
   const [commEmail, setCommEmail] = useState("")
+  
+  // Password change states
+  const [oldPassword, setOldPassword] = useState("")
+  const [newPassword, setNewPassword] = useState("")
+  const [confirmPassword, setConfirmPassword] = useState("")
+  const [changingPassword, setChangingPassword] = useState(false)
 
   useEffect(() => {
     if (session?.user) {
@@ -41,6 +47,43 @@ export default function ProfilePage() {
       }
     } finally {
       setLoading(false)
+    }
+  }
+
+  const handleChangePassword = async () => {
+    if (!oldPassword || !newPassword || !confirmPassword) {
+      toast.error("Please fill all password fields")
+      return
+    }
+    if (newPassword !== confirmPassword) {
+      toast.error("New passwords do not match")
+      return
+    }
+    if (newPassword.length < 6) {
+      toast.error("Password must be at least 6 characters")
+      return
+    }
+
+    setChangingPassword(true)
+    try {
+      const res = await fetch("/api/user/password", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ oldPassword, newPassword }),
+      })
+      const data = await res.json()
+      if (res.ok) {
+        toast.success("Password changed successfully")
+        setOldPassword("")
+        setNewPassword("")
+        setConfirmPassword("")
+      } else {
+        toast.error(data.error || "Failed to change password")
+      }
+    } catch (err) {
+      toast.error("Network error. Try again.")
+    } finally {
+      setChangingPassword(false)
     }
   }
 
@@ -103,6 +146,49 @@ export default function ProfilePage() {
           </div>
           <Button onClick={handleUpdate} disabled={loading} className="bg-indigo-600 hover:bg-indigo-700">
             {loading ? "Updating..." : "Save Preferences"}
+          </Button>
+        </CardContent>
+      </Card>
+
+      <Card>
+        <CardHeader>
+          <CardTitle className="flex items-center gap-2">
+            <Lock className="w-5 h-5 text-indigo-600" /> Change Password
+          </CardTitle>
+          <CardDescription>Update your login credentials</CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="space-y-2">
+            <Label htmlFor="oldPassword">Current Password</Label>
+            <Input 
+              id="oldPassword" 
+              type="password"
+              value={oldPassword} 
+              onChange={(e) => setOldPassword(e.target.value)} 
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label htmlFor="newPassword">New Password</Label>
+              <Input 
+                id="newPassword" 
+                type="password"
+                value={newPassword} 
+                onChange={(e) => setNewPassword(e.target.value)} 
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="confirmPassword">Confirm New Password</Label>
+              <Input 
+                id="confirmPassword" 
+                type="password"
+                value={confirmPassword} 
+                onChange={(e) => setConfirmPassword(e.target.value)} 
+              />
+            </div>
+          </div>
+          <Button onClick={handleChangePassword} disabled={changingPassword} className="bg-indigo-600 hover:bg-indigo-700">
+            {changingPassword ? "Changing..." : "Change Password"}
           </Button>
         </CardContent>
       </Card>

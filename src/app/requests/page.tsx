@@ -27,7 +27,8 @@ export default async function RequestsPage() {
     startDate: req.startDate.toLocaleDateString(),
     endDate: req.endDate.toLocaleDateString(),
     reason: req.reason,
-    status: req.status
+    status: req.status,
+    attachmentUrl: req.attachmentUrl
   }));
 
   const formattedCompOffs = compOffs.map(co => ({

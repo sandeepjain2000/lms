@@ -59,6 +59,22 @@ export function TeamDataTable<TData, TValue>({
     a.click()
   }
 
+  const handleExportCsv = () => {
+    const headers = "Name,Email,Role,Department,PL Balance,CL/SL Balance,Join Date,LWD\n"
+    const rows = table.getFilteredRowModel().rows.map(row => {
+      const d = row.original as any
+      return `"${d.name}","${d.email}","${d.role}","${d.department}","${d.plBalance}","${d.clSlBalance}","${d.joinDate}","${d.lastWorkingDay || ""}"`
+    }).join("\n")
+    
+    const blob = new Blob([headers + rows], { type: 'text/csv' })
+    const url = window.URL.createObjectURL(blob)
+    const a = document.createElement('a')
+    a.href = url
+    a.download = `team_directory_${new Date().toISOString().split('T')[0]}.csv`
+    a.click()
+    toast.success("Directory exported successfully")
+  }
+
   const handleImportCsv = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
@@ -139,6 +155,9 @@ export function TeamDataTable<TData, TValue>({
           />
           <Button variant="outline" onClick={handleDownloadTemplate} size="sm">
             <FileDown className="w-4 h-4 mr-2" /> Template
+          </Button>
+          <Button variant="outline" onClick={handleExportCsv} size="sm">
+            <FileDown className="w-4 h-4 mr-2 text-indigo-600" /> Export CSV
           </Button>
           <Button variant="outline" onClick={() => fileInputRef.current?.click()} size="sm" disabled={isImporting}>
             {isImporting ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Upload className="w-4 h-4 mr-2" />}

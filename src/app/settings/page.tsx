@@ -16,11 +16,10 @@ export default async function SettingsPage() {
   const testMode = await prisma.systemDateOverride.findFirst({ orderBy: { createdAt: 'desc' } })
   const users = await prisma.user.findMany({ select: { id: true, name: true } })
 
-  // Load system config keys
-  const clBalanceSetting = await prisma.systemConfig.findUnique({
-    where: { key: 'SHOW_CL_BALANCE_TO_EMPLOYEE' },
-  })
-  const showClBalanceToEmployee = clBalanceSetting?.value === 'true'
+  // Load system configs
+  const configs = await prisma.systemConfig.findMany()
+  const configMap = Object.fromEntries(configs.map(c => [c.key, c.value]))
+  const showClBalanceToEmployee = configMap['SHOW_CL_BALANCE_TO_EMPLOYEE'] === 'true'
 
   return (
     <SettingsClient
@@ -40,6 +39,7 @@ export default async function SettingsPage() {
       } : null}
       users={users}
       showClBalanceToEmployee={showClBalanceToEmployee}
+      initialConfigs={configMap}
     />
   )
 }

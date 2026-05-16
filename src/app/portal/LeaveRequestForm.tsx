@@ -10,11 +10,12 @@ import { toast } from "sonner";
 import { AlertCircle, CalendarClock } from "lucide-react";
 import { submitLeaveRequest } from "./actions";
 
-export function LeaveRequestForm({ userId, balances }: { userId: string, balances: any }) {
+export function LeaveRequestForm({ userId, balances, maxNegative }: { userId: string, balances: any, maxNegative: number }) {
   const [type, setType] = useState("");
   const [startDate, setStartDate] = useState("");
   const [endDate, setEndDate] = useState("");
   const [reason, setReason] = useState("");
+  const [documentUrl, setDocumentUrl] = useState("");
   const [loading, setLoading] = useState(false);
 
   // Server Projected State
@@ -23,7 +24,7 @@ export function LeaveRequestForm({ userId, balances }: { userId: string, balance
   const [convertedToPl, setConvertedToPl] = useState(false);
   const [isProjecting, setIsProjecting] = useState(false);
 
-  const MAX_NEGATIVE = -5 // Rule 44: configurable minimum negative balance
+  const MAX_NEGATIVE = maxNegative || -5 // Rule 44: configurable minimum negative balance
 
   useEffect(() => {
     async function fetchProjection() {
@@ -97,6 +98,7 @@ export function LeaveRequestForm({ userId, balances }: { userId: string, balance
         reason,
         isNegative: wouldGoNegative,
         negativeAmount: wouldGoNegative ? Math.abs(netBalance) : 0,
+        attachmentUrl: documentUrl,
       })
       
       if (wouldGoNegative) {
@@ -104,7 +106,7 @@ export function LeaveRequestForm({ userId, balances }: { userId: string, balance
       } else {
         toast.success("Leave request submitted successfully")
       }
-      setType(""); setStartDate(""); setEndDate(""); setReason("");
+      setType(""); setStartDate(""); setEndDate(""); setReason(""); setDocumentUrl("");
       setProjectedDays(0);
       setProjectedBalanceMap(null);
     } catch (err) {
@@ -169,14 +171,24 @@ export function LeaveRequestForm({ userId, balances }: { userId: string, balance
         />
       </div>
 
+      <div className="space-y-2">
+        <Label htmlFor="documentUrl">Web Link / Document URL (Optional)</Label>
+        <Input 
+          id="documentUrl" 
+          placeholder="e.g. Google Drive link for medical certificate or documents" 
+          value={documentUrl}
+          onChange={e => setDocumentUrl(e.target.value)}
+        />
+        <p className="text-xs text-slate-500">Provide a link to supporting documents if required (Rule 46).</p>
+      </div>
+
       {type === 'SL' && projectedDays > 2 && (
         <div className="space-y-2 p-4 bg-amber-50 rounded-lg border border-amber-200">
-          <Label htmlFor="medical" className="text-amber-800 flex items-center gap-2">
+          <p className="text-sm text-amber-800 flex items-center gap-2 font-semibold">
             <AlertCircle className="w-4 h-4" />
             Medical Certificate Required
-          </Label>
-          <Input id="medical" type="file" required className="bg-white" />
-          <p className="text-xs text-amber-700">Sick leaves exceeding 2 days require a medical certificate upload.</p>
+          </p>
+          <p className="text-xs text-amber-700">Sick leaves exceeding 2 days require a medical certificate. Please paste the link above.</p>
         </div>
       )}
 

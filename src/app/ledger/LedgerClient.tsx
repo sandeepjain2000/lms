@@ -5,7 +5,9 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/com
 import { Badge } from "@/components/ui/badge"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { BookOpen, User, TrendingDown, TrendingUp, EyeOff, Loader2, Download, FileText } from "lucide-react"
+import { 
+  BookOpen, User, TrendingDown, TrendingUp, EyeOff, Loader2, Download, FileText, CheckCircle2, Info 
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { jsPDF } from "jspdf"
 import autoTable from "jspdf-autotable"
@@ -144,12 +146,9 @@ export function LedgerClient({
   }
 
   // Summary stats
-  const totalClTaken = entries
-    .filter((e) => e.type === "CL" && e.clDebit)
-    .reduce((s, e) => s + (e.clDebit ?? 0), 0)
-  const totalPlTaken = entries
-    .filter((e) => e.type === "PL" && e.plDebit)
-    .reduce((s, e) => s + (e.plDebit ?? 0), 0)
+  const totalClTaken = entries.reduce((acc, e) => acc + (e.clDebit || 0), 0)
+  const totalPlTaken = entries.reduce((acc, e) => acc + (e.plDebit || 0), 0)
+  
   const closing = entries.find((e) => e.isClosing)
 
   const yearOptions = [year - 1, year, year + 1].filter((y) => y >= 2024)
@@ -276,11 +275,23 @@ export function LedgerClient({
 
         <Card className="border-orange-200 bg-orange-50">
           <CardContent className="p-4">
-            <p className="text-xs font-medium text-orange-600 mb-1 flex items-center gap-1">
-              <TrendingDown className="w-3 h-3" /> CL Taken
-            </p>
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-medium text-orange-600">CL Taken</p>
+              <TrendingDown className="w-4 h-4 text-orange-500" />
+            </div>
             <p className="text-2xl font-bold text-orange-800">{fmtDays(totalClTaken)}</p>
-            <p className="text-xs text-orange-400 mt-0.5">days used (YTD)</p>
+            <p className="text-[11px] text-orange-400 mt-1">days used (YTD)</p>
+          </CardContent>
+        </Card>
+
+        <Card className="border-violet-200 bg-violet-50">
+          <CardContent className="p-4">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-sm font-medium text-violet-600">PL Taken</p>
+              <TrendingDown className="w-4 h-4 text-violet-500" />
+            </div>
+            <p className="text-2xl font-bold text-violet-800">{fmtDays(totalPlTaken)}</p>
+            <p className="text-[11px] text-violet-400 mt-1">days used (YTD)</p>
           </CardContent>
         </Card>
 
@@ -289,16 +300,6 @@ export function LedgerClient({
             <p className="text-xs font-medium text-violet-600 mb-1">PL Opening</p>
             <p className="text-2xl font-bold text-violet-800">{fmtDays(selectedUser.openingPl)}</p>
             <p className="text-xs text-violet-400 mt-0.5">1 Jan {selectedYear}</p>
-          </CardContent>
-        </Card>
-
-        <Card className="border-purple-200 bg-purple-50">
-          <CardContent className="p-4">
-            <p className="text-xs font-medium text-purple-600 mb-1 flex items-center gap-1">
-              <TrendingDown className="w-3 h-3" /> PL Taken
-            </p>
-            <p className="text-2xl font-bold text-purple-800">{fmtDays(totalPlTaken)}</p>
-            <p className="text-xs text-purple-400 mt-0.5">days used (YTD)</p>
           </CardContent>
         </Card>
       </div>

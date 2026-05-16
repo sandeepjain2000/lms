@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { toast } from "sonner"
 import { Eye, EyeOff, Loader2, ShieldCheck, Users, LogIn } from "lucide-react"
+import { PuppyLoader } from "@/components/ui/PuppyLoader"
 
 const TEST_ACCOUNTS = [
   {
@@ -84,7 +85,13 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex">
+    <div className="min-h-screen flex relative">
+      {loading && (
+        <div className="absolute inset-0 z-[100] bg-white/80 backdrop-blur-sm flex flex-col items-center justify-center space-y-4">
+          <PuppyLoader />
+          <p className="text-indigo-600 font-bold animate-pulse">Running your login...</p>
+        </div>
+      )}
       {/* ── Left Branding Panel ── */}
       <div className="hidden lg:flex lg:w-[45%] bg-gradient-to-br from-indigo-600 via-indigo-700 to-purple-800 flex-col justify-between p-12 text-white relative overflow-hidden">
         {/* Background decoration */}

@@ -13,10 +13,11 @@ export async function submitLeaveRequest(data: {
   reason: string
   isNegative: boolean
   negativeAmount: number
+  attachmentUrl?: string
 }) {
-  const { userId, type, startDate, endDate, reason, isNegative, negativeAmount } = data
+  const { userId, type, startDate, endDate, reason, isNegative, negativeAmount, attachmentUrl } = data
 
-  const [user, holidays, sandwichConfig] = await Promise.all([
+  const [user, holidays, sandwichConfig, probationConfig] = await Promise.all([
     prisma.user.findUnique({
       where: { id: userId },
       select: { name: true, email: true, communicationEmail: true, joinDate: true }
@@ -24,15 +25,18 @@ export async function submitLeaveRequest(data: {
     prisma.holiday.findMany({
       where: { date: { gte: new Date(new Date(startDate).getFullYear(), 0, 1), lte: new Date(new Date(startDate).getFullYear(), 11, 31) } }
     }),
-    prisma.systemConfig.findUnique({ where: { key: "weekend_sandwich_rule" } })
+    prisma.systemConfig.findUnique({ where: { key: "weekend_sandwich_rule" } }),
+    prisma.systemConfig.findUnique({ where: { key: "PROBATION_PERIOD_MONTHS" } })
   ]);
+  
+  const probationMonths = parseInt(probationConfig?.value || "6")
 
   // Rule 50: Probation Check
   if (type === 'PL') {
-    const sixMonthsAgo = new Date()
-    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6)
-    if (user && user.joinDate > sixMonthsAgo) {
-      throw new Error("Privilege Leave (PL) cannot be applied during the 6-month probation period (Rule 50).")
+    const probationLimit = new Date()
+    probationLimit.setMonth(probationLimit.getMonth() - probationMonths)
+    if (user && user.joinDate > probationLimit) {
+      throw new Error(`Privilege Leave (PL) cannot be applied during the ${probationMonths}-month probation period (Rule 50).`)
     }
   }
 
@@ -58,17 +62,51 @@ export async function submitLeaveRequest(data: {
       status: "PENDING",
       isNegative,
       negativeAmount,
+      attachmentUrl,
       year: new Date().getFullYear(),
     },
   })
 
-  // Email logic... (omitted for brevity in this scratch, but preserved in file)
-  const targetEmail = user?.communicationEmail || user?.email || "sandeepjain200019@gmail.com"
+  // Log the action
+  await prisma.auditLog.create({
+    data: {
+      userId,
+      action: 'LEAVE_APPLIED',
+      entity: 'LeaveRequest',
+      entityId: request.id,
+      metadata: JSON.stringify({ type, startDate, endDate, days, isNegative, attachmentUrl })
+    }
+  })
+
+  // Fetch HR and Managers for notification
+  const adminsAndManagers = await prisma.user.findMany({
+    where: {
+      role: { in: ['ADMIN', 'MANAGER'] },
+      status: 'ACTIVE'
+    },
+    select: { email: true, communicationEmail: true }
+  })
+
+  const adminEmails = adminsAndManagers.map(u => u.communicationEmail || u.email)
+  const applicantEmail = user?.communicationEmail || user?.email || "sandeepjain200019@gmail.com"
+
+  // 1. Notify Applicant
   await sendEmail({
-    to: targetEmail,
+    to: applicantEmail,
     subject: `Leave Application Received: ${type} (${days} days)`,
     html: `<p>Hello ${user?.name}, your request for ${days} days is Pending Approval.</p>`
   })
+
+  // 2. Notify HR & Managers
+  if (adminEmails.length > 0) {
+    await Promise.all(adminEmails.map(email => 
+      sendEmail({
+        to: email,
+        subject: `New Leave Application: ${user?.name} (${type})`,
+        html: `<p>${user?.name} has applied for ${days} days of ${type} leave from ${startDate} to ${endDate}.</p><p>Reason: ${reason}</p>`
+      })
+    ))
+  }
 
   revalidatePath("/portal")
   revalidatePath("/")
@@ -92,6 +130,17 @@ export async function submitCompOffWork(data: {
       reason,
       daysCredited,
       status: "PENDING"
+    }
+  })
+
+  // Log the action
+  await prisma.auditLog.create({
+    data: {
+      userId,
+      action: 'COMPOFF_WORK_LOGGED',
+      entity: 'CompOffWorkEntry',
+      entityId: entry.id,
+      metadata: JSON.stringify({ dateWorked, hoursWorked, daysCredited })
     }
   })
 

@@ -36,6 +36,7 @@ model User {
   negativeLeaves  NegativeLeaveTracking[]
   compOffEntries  CompOffWorkEntry[]
   auditLogs       AuditLog[]
+  lastWorkingDay  DateTime?
   communicationEmail String                  @default("sandeepjain200019@gmail.com")
   createdAt       DateTime                @default(now())
   updatedAt       DateTime                @updatedAt
@@ -217,5 +218,57 @@ model AuditLog {
   newValue    String?
   metadata    String?  // JSON string for extra info
   ipAddress   String?
+  createdAt   DateTime @default(now())
+}
+// --- SEED TABLES (Rule: Demo Reset) ---
+model SeedDepartment {
+  id        String   @id @default(cuid())
+  name      String   @unique
+  createdAt DateTime @default(now())
+}
+
+model SeedUser {
+  id              String   @id @default(cuid())
+  name            String
+  email           String   @unique
+  role            String
+  password        String
+  departmentId    String?
+  joinDate        DateTime
+  status          String
+  communicationEmail String
+  createdAt       DateTime @default(now())
+}
+
+model SeedLeaveBalance {
+  id              String   @id @default(cuid())
+  userId          String   @unique
+  year            Int
+  openingPl       Float
+  openingCl       Float
+  openingComp     Float
+  pl              Float
+  cl              Float
+  sl              Float
+  comp            Float
+  plAccrued       Float
+  plUsed          Float
+  clUsed          Float
+  slUsed          Float
+  createdAt       DateTime @default(now())
+}
+
+model SeedHoliday {
+  id          String   @id @default(cuid())
+  date        DateTime @unique
+  name        String
+  type        String
+  createdAt   DateTime @default(now())
+}
+
+model SeedSystemConfig {
+  id          String   @id @default(cuid())
+  key         String   @unique
+  value       String
   createdAt   DateTime @default(now())
 }

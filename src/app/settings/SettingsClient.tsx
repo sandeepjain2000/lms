@@ -11,12 +11,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Textarea } from "@/components/ui/textarea"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
 import { toast } from "sonner"
-import {
+import { 
   Lock, AlertTriangle, Clock, Calculator, FlaskConical,
-  PlusCircle, MinusCircle, History, ShieldAlert, Eye, EyeOff, BookOpen
+  PlusCircle, MinusCircle, History, ShieldAlert, Eye, EyeOff, BookOpen, RefreshCcw, Shield, Loader2
 } from "lucide-react"
+import { signOut } from "next-auth/react"
 
-export function SettingsClient({ closures, adjustments, negativeLeaves, testMode, users, showClBalanceToEmployee }: any) {
+export function SettingsClient({ closures, adjustments, negativeLeaves, testMode, users, showClBalanceToEmployee, initialConfigs }: any) {
   const [testDate, setTestDate] = useState(new Date().toISOString().split('T')[0])
   const [isTestMode, setIsTestMode] = useState(testMode?.isTestMode ?? false)
   const [adjUserId, setAdjUserId] = useState("")
@@ -30,6 +31,16 @@ export function SettingsClient({ closures, adjustments, negativeLeaves, testMode
   const [accrualMonth, setAccrualMonth] = useState(new Date().getMonth().toString())
   const [accrualYear, setAccrualYear] = useState(new Date().getFullYear().toString())
   const [runningAccrual, setRunningAccrual] = useState(false)
+  
+  // New config states
+  const [accrualRate, setAccrualRate] = useState(initialConfigs?.['ACCRUAL_RATE_PL'] || "1.5")
+  const [accrualBase, setAccrualBase] = useState(initialConfigs?.['ACCRUAL_BASE_DAYS'] || "20")
+  const [maxCarryForward, setMaxCarryForward] = useState(initialConfigs?.['MAX_CARRY_FORWARD_PL'] || "30")
+  const [minWorkedDays, setMinWorkedDays] = useState(initialConfigs?.['MIN_WORKED_DAYS_FOR_PL'] || "15")
+  const [probationMonths, setProbationMonths] = useState(initialConfigs?.['PROBATION_PERIOD_MONTHS'] || "6")
+  const [maxNegative, setMaxNegative] = useState(initialConfigs?.['MAX_NEGATIVE_LEAVE'] || "-5")
+  const [savingGlobalConfigs, setSavingGlobalConfigs] = useState(false)
+  const [resetting, setResetting] = useState(false)
 
   const handleCloseYear = async () => {
     if (!confirm("Are you sure you want to close the year 2026? This will reset CL/SL and carry forward PL. This action is irreversible.")) return
@@ -51,10 +62,6 @@ export function SettingsClient({ closures, adjustments, negativeLeaves, testMode
     } finally {
       setClosing(false)
     }
-  }
-
-  const handleSimulate = (scenario: string) => {
-    toast.info(`Simulating: ${scenario} for date ${testDate}`)
   }
 
   const handleAdjustment = async () => {
@@ -91,6 +98,33 @@ export function SettingsClient({ closures, adjustments, negativeLeaves, testMode
     }
   }
 
+  const handleSaveGlobalConfigs = async () => {
+    setSavingGlobalConfigs(true)
+    try {
+      const configs = [
+        { key: 'ACCRUAL_RATE_PL', value: accrualRate },
+        { key: 'ACCRUAL_BASE_DAYS', value: accrualBase },
+        { key: 'MAX_CARRY_FORWARD_PL', value: maxCarryForward },
+        { key: 'MIN_WORKED_DAYS_FOR_PL', value: minWorkedDays },
+        { key: 'PROBATION_PERIOD_MONTHS', value: probationMonths },
+        { key: 'MAX_NEGATIVE_LEAVE', value: maxNegative },
+      ]
+
+      await Promise.all(configs.map(c => 
+        fetch('/api/leave/config', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(c),
+        })
+      ))
+      toast.success("Global configurations saved successfully.")
+    } catch (err) {
+      toast.error("Failed to save some configurations.")
+    } finally {
+      setSavingGlobalConfigs(false)
+    }
+  }
+
   const handleSaveClSetting = async () => {
     setSavingClSetting(true)
     try {
@@ -110,6 +144,28 @@ export function SettingsClient({ closures, adjustments, negativeLeaves, testMode
       }
     } finally {
       setSavingClSetting(false)
+    }
+  }
+
+  const handleResetToSeed = async () => {
+    if (!confirm("CRITICAL WARNING: This will delete ALL current transactions, requests, and adjustments and restore the system to its initial seed state. This cannot be undone. You will be logged out. Proceed?")) return
+    
+    setResetting(true)
+    try {
+      const res = await fetch("/api/admin/reset-to-seed", { method: "POST" })
+      const data = await res.json()
+      if (res.ok) {
+        toast.success("System reset successful. Logging out...")
+        setTimeout(() => {
+          signOut({ callbackUrl: "/login" })
+        }, 2000)
+      } else {
+        toast.error(data.error || "Reset failed")
+      }
+    } catch (err) {
+      toast.error("Network error during reset")
+    } finally {
+      setResetting(false)
     }
   }
 
@@ -139,13 +195,15 @@ export function SettingsClient({ closures, adjustments, negativeLeaves, testMode
     <div className="space-y-6 max-w-7xl mx-auto">
       <div>
         <h1 className="text-2xl font-bold tracking-tight">Settings & Admin Controls</h1>
-        <p className="text-slate-500">Year-end closure, manual adjustments, test mode simulation, and negative leave management.</p>
+        <p className="text-slate-500">System maintenance, policies, year-end closure, and manual adjustments.</p>
       </div>
 
       <Tabs defaultValue="yearend">
         <TabsList className="mb-4 flex-wrap h-auto gap-1">
           <TabsTrigger value="yearend"><Lock className="w-4 h-4 mr-2" />Year-End Closure</TabsTrigger>
+          <TabsTrigger value="policy"><ShieldAlert className="w-4 h-4 mr-2" />Policy Config</TabsTrigger>
           <TabsTrigger value="adjustments"><Calculator className="w-4 h-4 mr-2" />Manual Adjustments</TabsTrigger>
+          <TabsTrigger value="maintenance"><Shield className="w-4 h-4 mr-2" />Maintenance</TabsTrigger>
           <TabsTrigger value="negative"><AlertTriangle className="w-4 h-4 mr-2" />Negative Leave</TabsTrigger>
           <TabsTrigger value="testmode"><FlaskConical className="w-4 h-4 mr-2" />Test / Simulation</TabsTrigger>
           <TabsTrigger value="ledgersettings"><BookOpen className="w-4 h-4 mr-2" />Ledger Settings</TabsTrigger>
@@ -217,7 +275,89 @@ export function SettingsClient({ closures, adjustments, negativeLeaves, testMode
           </div>
         </TabsContent>
 
-        {/* ── Manual Adjustments Tab ── */}
+        {/* ── Policy Configuration Tab ── */}
+        <TabsContent value="policy" className="space-y-4">
+          <Card>
+            <CardHeader>
+              <CardTitle>Global Leave Policies</CardTitle>
+              <CardDescription>Configure accrual rates, base working days, and probation rules.</CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div className="space-y-2">
+                  <Label>PL Accrual Rate (days per month)</Label>
+                  <Input type="number" step="0.1" value={accrualRate} onChange={e => setAccrualRate(e.target.value)} />
+                  <p className="text-xs text-slate-500">Default: 1.5</p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Accrual Base Working Days</Label>
+                  <Input type="number" value={accrualBase} onChange={e => setAccrualBase(e.target.value)} />
+                  <p className="text-xs text-slate-500">Used for pro-rata: (Worked / Base) * Rate. Default: 20</p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Max PL Carry Forward (days)</Label>
+                  <Input type="number" value={maxCarryForward} onChange={e => setMaxCarryForward(e.target.value)} />
+                  <p className="text-xs text-slate-500">Default: 30</p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Min Worked Days for Eligibility</Label>
+                  <Input type="number" value={minWorkedDays} onChange={e => setMinWorkedDays(e.target.value)} />
+                  <p className="text-xs text-slate-500">Must work at least these many days to get any PL. Default: 15</p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Probation Period (months)</Label>
+                  <Input type="number" value={probationMonths} onChange={e => setProbationMonths(e.target.value)} />
+                  <p className="text-xs text-slate-500">PL cannot be applied during this period. Default: 6</p>
+                </div>
+                <div className="space-y-2">
+                  <Label>Max Allowed Negative Balance</Label>
+                  <Input type="number" value={maxNegative} onChange={e => setMaxNegative(e.target.value)} />
+                  <p className="text-xs text-slate-500">Example: -5. Default: -5</p>
+                </div>
+              </div>
+              <Button 
+                className="w-full bg-indigo-600 hover:bg-indigo-700" 
+                onClick={handleSaveGlobalConfigs}
+                disabled={savingGlobalConfigs}
+              >
+                {savingGlobalConfigs ? "Saving..." : "Save Policy Configuration"}
+              </Button>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
+        {/* ── System Maintenance Tab ── */}
+        <TabsContent value="maintenance" className="space-y-4">
+          <Card className="border-red-200 bg-red-50">
+            <CardHeader>
+              <CardTitle className="text-red-700 flex items-center gap-2">
+                <AlertTriangle className="w-5 h-5" /> Danger Zone: System Reset
+              </CardTitle>
+              <CardDescription className="text-red-600">
+                These actions are destructive and intended for testing/demo purposes.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="space-y-4">
+              <div className="p-4 bg-white rounded-lg border border-red-200">
+                <h4 className="font-bold text-red-800 mb-2">Reset to Seed State</h4>
+                <p className="text-sm text-slate-600 mb-4">
+                  This will delete all current leave requests, adjustments, and transactions. 
+                  The system will be restored to the "mirror" state captured at initialization.
+                </p>
+                <Button 
+                  variant="destructive" 
+                  className="w-full flex items-center justify-center gap-2"
+                  onClick={handleResetToSeed}
+                  disabled={resetting}
+                >
+                  {resetting ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCcw className="w-4 h-4" />}
+                  Wipe Data & Restore from Seed
+                </Button>
+              </div>
+            </CardContent>
+          </Card>
+        </TabsContent>
+
         <TabsContent value="adjustments" className="space-y-4">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
             <Card>
