@@ -1,4 +1,7 @@
 import prisma from '@/lib/prisma'
+import { DataTable } from './DataTable'
+import { columns, compOffColumns } from './columns'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 
 export default async function RequestsPage() {
   const [requests, compOffs] = await Promise.all([

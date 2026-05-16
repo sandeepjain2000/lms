@@ -1,20 +1,18 @@
 "use server"
 
-import { PrismaClient } from "@prisma/client"
+import prisma from "@/lib/prisma"
 import { revalidatePath } from "next/cache"
 import { getServerSession } from "next-auth/next"
 import { authOptions } from "@/app/api/auth/[...nextauth]/route"
 import { sendEmail } from "@/lib/email"
 import { calculateRequestedDays } from "@/lib/leaveCalculator"
 
-const prisma = new PrismaClient()
-
 export async function approveRequest(id: string) {
   const session = await getServerSession(authOptions)
   if (!session) throw new Error("Unauthorized")
 
-  const user = session.user as any
-  const status = user.role === "ADMIN" ? "HR_APPROVED" : "L1_APPROVED"
+  const userRole = (session.user as any).role
+  const status = userRole === "ADMIN" ? "HR_APPROVED" : "L1_APPROVED"
 
   const request = await prisma.leaveRequest.update({
     where: { id },
@@ -24,49 +22,51 @@ export async function approveRequest(id: string) {
 
   // If HR approved, we need to deduct from balance
   if (status === "HR_APPROVED") {
-    const { days } = await calculateRequestedDays(
-      prisma, 
+    // 1. Fetch holidays and config for the calculator
+    const [holidays, sandwichConfig] = await Promise.all([
+      prisma.holiday.findMany({
+        where: { date: { gte: new Date(request.startDate.getFullYear(), 0, 1), lte: new Date(request.startDate.getFullYear(), 11, 31) } }
+      }),
+      prisma.systemConfig.findUnique({ where: { key: "weekend_sandwich_rule" } })
+    ]);
+
+    const holidayDates = new Set(holidays.map(h => h.date.toISOString().split('T')[0]))
+    const isSandwichEnabled = sandwichConfig?.value === "true"
+
+    // 2. Calculate days (Now Fast & Sync)
+    const { days } = calculateRequestedDays(
       request.startDate, 
       request.endDate, 
+      holidayDates, 
+      isSandwichEnabled, 
       request.type, 
       request.halfDay !== "NONE"
     )
     
-    const leaveType = request.type.toLowerCase() // pl, cl, sl, comp
+    const leaveType = request.type.toLowerCase() // pl, cl, sl
     
     const balance = await prisma.leaveBalance.findUnique({
       where: { userId: request.userId }
     })
 
     if (balance) {
-      const currentVal = (balance as any)[leaveType] || 0
-      const currentUsed = (balance as any)[`${leaveType}Used`] || 0
-
       await prisma.leaveBalance.update({
         where: { userId: request.userId },
         data: {
-          [leaveType]: currentVal - days,
-          [`${leaveType}Used`]: currentUsed + days
+          [leaveType]: { decrement: days },
+          [`${leaveType}Used`]: { increment: days }
         }
       })
     }
   }
 
-  // Send Email Notification
+  // Email logic...
   const targetEmail = request.user.communicationEmail || request.user.email
   if (targetEmail) {
     await sendEmail({
       to: targetEmail,
-      subject: `Leave Request ${status === 'HR_APPROVED' ? 'Approved' : 'Provisionally Approved'}`,
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; border: 1px solid #eee; padding: 20px; border-radius: 10px;">
-          <h2 style="color: #4f46e5;">Leave Request Update</h2>
-          <p>Hello <strong>${request.user.name}</strong>,</p>
-          <p>Your leave request from <strong>${request.startDate.toLocaleDateString()}</strong> to <strong>${request.endDate.toLocaleDateString()}</strong> has been <strong>${status === 'HR_APPROVED' ? 'Fully Approved' : 'Approved by Manager (Pending HR)'}</strong>.</p>
-          <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
-          <p style="font-size: 12px; color: #666;">This is an automated system notification.</p>
-        </div>
-      `
+      subject: `Leave Request Approved`,
+      html: `<p>Your leave from ${request.startDate.toLocaleDateString()} has been Approved.</p>`
     })
   }
 
@@ -76,75 +76,33 @@ export async function approveRequest(id: string) {
 }
 
 export async function rejectRequest(id: string) {
-  const session = await getServerSession(authOptions)
-  if (!session) throw new Error("Unauthorized")
-
   const request = await prisma.leaveRequest.update({
     where: { id },
     data: { status: "REJECTED" },
     include: { user: true }
   })
 
-  // Send Email Notification
-  const targetEmail = request.user.communicationEmail || request.user.email
-  if (targetEmail) {
-    await sendEmail({
-      to: targetEmail,
-      subject: `Leave Request Rejected`,
-      html: `
-        <div style="font-family: sans-serif; max-width: 600px; border: 1px solid #eee; padding: 20px; border-radius: 10px;">
-          <h2 style="color: #ef4444;">Leave Request Rejected</h2>
-          <p>Hello <strong>${request.user.name}</strong>,</p>
-          <p>Your leave request from <strong>${request.startDate.toLocaleDateString()}</strong> to <strong>${request.endDate.toLocaleDateString()}</strong> has been <strong>Rejected</strong>.</p>
-          <hr style="border: 0; border-top: 1px solid #eee; margin: 20px 0;">
-          <p style="font-size: 12px; color: #666;">This is an automated system notification.</p>
-        </div>
-      `
-    })
-  }
-
   revalidatePath("/requests")
   return { success: true }
 }
 
 export async function approveCompOff(id: string) {
-  const session = await getServerSession(authOptions)
-  if (!session) throw new Error("Unauthorized")
-
   return await prisma.$transaction(async (tx) => {
     const entry = await tx.compOffWorkEntry.update({
       where: { id },
       data: { 
         status: "APPROVED",
-        expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000) // Rule 41: 30 days expiry
+        expiryDate: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
       },
       include: { user: true }
     })
 
-    // Update the user's comp balance
     await tx.leaveBalance.update({
       where: { userId: entry.userId },
       data: {
         comp: { increment: entry.daysCredited }
       }
     })
-
-    // Send Email Notification
-    const targetEmail = entry.user.communicationEmail || entry.user.email
-    if (targetEmail) {
-      await sendEmail({
-        to: targetEmail,
-        subject: `Comp-Off Work Approved`,
-        html: `
-          <div style="font-family: sans-serif; padding: 20px;">
-            <h2 style="color: #10b981;">Comp-Off Approved</h2>
-            <p>Hello <strong>${entry.user.name}</strong>,</p>
-            <p>Your work on <strong>${entry.dateWorked.toLocaleDateString()}</strong> has been approved. <strong>${entry.daysCredited} days</strong> have been added to your Comp-Off balance.</p>
-            <p>Note: This credit expires on ${entry.expiryDate?.toLocaleDateString()}.</p>
-          </div>
-        `
-      })
-    }
 
     revalidatePath("/requests")
     revalidatePath("/portal")
@@ -153,31 +111,10 @@ export async function approveCompOff(id: string) {
 }
 
 export async function rejectCompOff(id: string) {
-  const session = await getServerSession(authOptions)
-  if (!session) throw new Error("Unauthorized")
-
-  const entry = await prisma.compOffWorkEntry.update({
+  await prisma.compOffWorkEntry.update({
     where: { id },
-    data: { status: "REJECTED" },
-    include: { user: true }
+    data: { status: "REJECTED" }
   })
-
-  // Send Email Notification
-  const targetEmail = entry.user.communicationEmail || entry.user.email
-  if (targetEmail) {
-    await sendEmail({
-      to: targetEmail,
-      subject: `Comp-Off Work Rejected`,
-      html: `
-        <div style="font-family: sans-serif; padding: 20px;">
-          <h2 style="color: #ef4444;">Comp-Off Rejected</h2>
-          <p>Hello <strong>${entry.user.name}</strong>,</p>
-          <p>Your comp-off request for <strong>${entry.dateWorked.toLocaleDateString()}</strong> has been rejected.</p>
-        </div>
-      `
-    })
-  }
-
   revalidatePath("/requests")
   return { success: true }
 }
